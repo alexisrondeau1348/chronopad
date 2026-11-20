@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- Optimisation Application Web iPad / iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ChronoPad">
+    <title>ChronoPad - Horodateur Tactile iPad</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-overflow-scrolling: touch;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .touch-tile {
+            touch-action: manipulation;
+            transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease;
+        }
+        .touch-tile:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+        body.is-embedded main {
+            padding-top: 0.75rem;
+            padding-bottom: 1rem;
+        }
+    </style>
+</head>
+<body class="min-h-full text-slate-800 flex flex-col bg-slate-100">
+
+    <!-- En-tête Tactile iPad -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-18 py-3 flex flex-wrap items-center justify-between gap-3">
+            <!-- Logo & Titre -->
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 text-white p-2.5 rounded-2xl shadow-sm">
+                    <i data-lucide="tablet" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">ChronoPad</h1>
+                    <p class="text-[11px] text-slate-500 font-semibold" id="ipad-live-clock">--:--</p>
+                </div>
+            </div>
+
+            <!-- Sélecteur de Profil grand format -->
+            <div class="flex items-center space-x-2 sm:space-x-2.5 flex-wrap gap-y-2">
+                <div id="profile-pill" class="flex items-center space-x-2 bg-amber-50 border-2 border-amber-300 px-3.5 py-2 rounded-2xl">
+                    <i data-lucide="user-circle-2" class="w-5 h-5 text-amber-600" id="profile-icon"></i>
+                    <select id="employee-profile-select" onchange="changeProfile(this.value)" class="bg-transparent text-sm sm:text-base font-extrabold text-slate-900 focus:outline-none pr-1">
+                        <option value="">Choisir mon profil...</option>
+                        <option value="Caroline">Caroline</option>
+                        <option value="Alexis">Alexis</option>
+                        <option value="Vincent">Vincent</option>
+                        <option value="Denis">Denis</option>
+                    </select>
+                </div>
+
+                <!-- Bouton Plein Écran (visible si intégré dans un iframe / Google Sites) -->
+                <a id="btn-open-fullscreen" href="#" target="_blank" rel="noopener noreferrer" class="hidden touch-tile items-center space-x-1.5 px-3.5 py-2.5 rounded-2xl border border-blue-200 bg-blue-50 text-blue-700 text-xs font-extrabold active:scale-95 transition" title="Ouvrir en plein écran sans le cadre Google Sites">
+                    <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                    <span class="hidden md:inline">Plein écran</span>
+                </a>
+
+                <!-- Bouton Alarme -->
+                <button id="btn-toggle-alarm" onclick="toggleAlarmSound()" class="p-3 rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600 active:scale-95 transition" title="Alarme sonore du planning">
+                    <i data-lucide="bell-ring" class="w-5 h-5" id="alarm-icon"></i>
+                </button>
+
+                <!-- Bouton Synchronisation -->
+                <button onclick="fetchCloudData()" class="p-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-600 active:scale-95 transition" title="Synchroniser Google Sheets">
+                    <i data-lucide="refresh-cw" class="w-5 h-5" id="sync-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenu Principal Optimisé iPad -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+        <!-- Astuce navigation si affiché dans Google Sites -->
+        <div id="embed-helper-banner" class="hidden bg-blue-50 border border-blue-200 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 text-xs text-blue-900">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="info" class="w-4 h-4 text-blue-600 shrink-0"></i>
+                <span>Mode intégré : pour une navigation tactile fluide sans cadre, ouvrez en plein écran ou ajoutez à l'écran d'accueil.</span>
+            </div>
+            <button type="button" onclick="document.getElementById('embed-helper-banner').classList.add('hidden')" class="text-blue-500 hover:text-blue-800 font-bold shrink-0">OK</button>
+        </div>
+
+        <!-- Bannière d'alerte créneau planning -->
+        <div id="planning-alarm-banner" class="hidden bg-indigo-600 text-white p-4 sm:p-5 rounded-3xl shadow-xl border border-indigo-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center space-x-3.5">
+                <div class="bg-white/20 p-3 rounded-2xl shrink-0">
+                    <i data-lucide="alarm-clock" class="w-7 h-7 text-white"></i>
+                </div>
+                <div>
+                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-200 block">Créneau Planning Type</span>
+                    <h4 id="planning-alarm-title" class="text-lg font-extrabold leading-snug">Nouveau créneau</h4>
+                    <p id="planning-alarm-subtitle" class="text-xs text-indigo-100">Touchez le bouton pour basculer le chronomètre</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2.5 w-full sm:w-auto justify-end">
+                <button id="btn-alarm-start-task" class="px-5 py-3 bg-white text-indigo-700 font-extrabold text-sm rounded-2xl shadow active:scale-95 transition">
+                    Démarrer maintenant
+                </button>
+                <button onclick="dismissPlanningAlarm()" class="px-4 py-3 bg-indigo-800/70 text-white font-bold text-sm rounded-2xl active:scale-95 transition">
+                    Fermer
+                </button>
+            </div>
+        </div>
+
+        <!-- Toast / Statut Cloud -->
+        <div id="sync-status" class="hidden p-3.5 rounded-2xl text-xs sm:text-sm font-bold text-center shadow-xs"></div>
+
+        <!-- Bandeau si aucun profil sélectionné -->
+        <div id="profile-warning-banner" class="bg-amber-50 border-2 border-amber-200 p-4 rounded-3xl flex items-center space-x-3 text-amber-900">
+            <i data-lucide="hand-metal" class="w-6 h-6 text-amber-600 shrink-0"></i>
+            <span class="text-sm font-bold">Sélectionnez votre prénom en haut à droite pour charger vos touches et démarrer le chronomètre.</span>
+        </div>
+
+        <!-- Carte Chronomètre Géant (Pupitre iPad) -->
+        <section id="active-timer-card" class="bg-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl transition-colors duration-300">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <!-- Info tâche active -->
+                <div class="space-y-1.5">
+                    <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/15 text-white/90">
+                        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 mr-2"></span>
+                        <span id="status-label">En attente</span>
+                    </div>
+                    <h2 id="current-task-name" class="text-3xl sm:text-4xl font-extrabold tracking-tight">Aucune tâche active</h2>
+                    <p id="current-task-sub" class="text-sm text-white/75 font-medium">Touchez une tuile ci-dessous pour lancer le temps</p>
+                </div>
+
+                <!-- Affichage Temps & Gros Boutons Tactiles -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6">
+                    <div class="bg-black/25 px-6 py-3 rounded-2xl border border-white/10 text-center">
+                        <span class="text-[10px] uppercase tracking-widest text-white/60 font-bold block">Chronomètre</span>
+                        <div id="timer-display" class="font-mono text-5xl sm:text-6xl font-extrabold tracking-tight">00:00:00</div>
+                    </div>
+
+                    <div class="grid grid-cols-3 sm:flex gap-2.5">
+                        <button id="btn-toggle-pause" onclick="togglePause()" disabled class="touch-tile px-4 sm:px-5 py-4 bg-white/15 hover:bg-white/25 disabled:opacity-30 rounded-2xl text-sm font-extrabold flex flex-col items-center justify-center gap-1 border border-white/15">
+                            <i data-lucide="pause" class="w-5 h-5" id="pause-icon"></i>
+                            <span id="pause-label">Pause</span>
+                        </button>
+                        <button id="btn-stop" onclick="stopCurrentTimer()" disabled class="touch-tile px-4 sm:px-5 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-30 rounded-2xl text-sm font-extrabold flex flex-col items-center justify-center gap-1 shadow-lg">
+                            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            <span>Valider</span>
+                        </button>
+                        <button id="btn-cancel" onclick="cancelCurrentTimer()" disabled class="touch-tile px-4 sm:px-5 py-4 bg-rose-500/25 hover:bg-rose-500/40 text-rose-100 disabled:opacity-30 rounded-2xl text-sm font-extrabold flex flex-col items-center justify-center gap-1 border border-rose-400/30">
+                            <i data-lucide="x-circle" class="w-5 h-5"></i>
+                            <span>Annuler</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grille des Touches Tactiles Grand Format -->
+        <section class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-base sm:text-lg font-extrabold text-slate-900 flex items-center">
+                    <i data-lucide="grid" class="w-5 h-5 mr-2 text-blue-600"></i>
+                    Mes Tâches (1 Touche)
+                </h3>
+                <div class="flex items-center space-x-2">
+                    <button id="btn-manual-entry" onclick="openManualEntryModal()" disabled class="touch-tile inline-flex items-center px-4 py-2.5 rounded-2xl bg-emerald-600 text-white text-xs sm:text-sm font-bold shadow-xs disabled:opacity-40">
+                        <i data-lucide="clock-plus" class="w-4 h-4 mr-1.5"></i>
+                        Saisie manuelle
+                    </button>
+                    <button id="btn-history-drawer" onclick="openHistoryModal()" disabled class="touch-tile inline-flex items-center px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-bold shadow-xs disabled:opacity-40">
+                        <i data-lucide="history" class="w-4 h-4 mr-1.5 text-blue-600"></i>
+                        Journal du jour (<span id="today-total-badge" class="font-mono ml-1 text-blue-700">0h 00m</span>)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tuiles larges optimisées doigts iPad (2 colonnes portrait, 3 à 4 colonnes paysage) -->
+            <div id="ipad-task-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <!-- Généré dynamiquement -->
+            </div>
+        </section>
+
+        <!-- Planning du Jour (Créneaux prévus aujourd'hui) -->
+        <section class="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="bg-indigo-50 text-indigo-600 p-2 rounded-xl">
+                        <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">Mon Planning du Jour (<span id="today-day-label">Aujourd'hui</span>)</h3>
+                        <p class="text-xs text-slate-500">Touchez un créneau prévu pour lancer directement le chronomètre</p>
+                    </div>
+                </div>
+                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl" id="today-slots-count">0 créneau</span>
+            </div>
+
+            <div id="ipad-today-planning" class="flex gap-3 overflow-x-auto pb-1">
+                <!-- Créneaux du jour générés horizontalement pour défilement tactile fluide -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Saisie Manuelle Tactile -->
+    <div id="modal-manual-entry" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="bg-emerald-100 text-emerald-700 p-2.5 rounded-2xl">
+                        <i data-lucide="clock-plus" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-900 text-lg">Saisie manuelle</h3>
+                        <p class="text-xs text-slate-500">Écrase/découpe automatiquement les chevauchements</p>
+                    </div>
+                </div>
+                <button onclick="closeManualEntryModal()" class="p-2 rounded-xl text-slate-400 hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Tâche</label>
+                <select id="manual-task-select" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-base font-bold text-slate-800 bg-white focus:border-emerald-500 focus:outline-none"></select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Date</label>
+                <input type="date" id="manual-date-input" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 text-base font-bold text-slate-800 focus:border-emerald-500 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Début</label>
+                    <input type="time" id="manual-start-input" oninput="updateManualDurationPreview()" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 text-base font-bold text-slate-800 focus:border-emerald-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fin</label>
+                    <input type="time" id="manual-end-input" oninput="updateManualDurationPreview()" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 text-base font-bold text-slate-800 focus:border-emerald-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex justify-between items-center">
+                <span class="text-xs font-bold text-slate-500 uppercase">Durée calculée :</span>
+                <span id="manual-duration-preview" class="font-mono text-base font-extrabold text-emerald-700">--</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="closeManualEntryModal()" class="py-3.5 border-2 border-slate-200 text-slate-600 rounded-2xl text-sm font-extrabold">Annuler</button>
+                <button onclick="saveManualEntry()" class="py-3.5 bg-emerald-600 text-white rounded-2xl text-sm font-extrabold shadow-md">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Journal du Jour -->
+    <div id="modal-today-history" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div>
+                    <h3 class="font-extrabold text-slate-900 text-lg">Activités enregistrées aujourd'hui</h3>
+                    <p class="text-xs text-slate-500" id="history-modal-subtitle">Total : 0h 00m</p>
+                </div>
+                <button onclick="closeHistoryModal()" class="p-2.5 rounded-2xl bg-slate-100 text-slate-600 font-bold">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div id="today-sessions-list" class="flex-1 overflow-y-auto space-y-2 pr-1">
+                <!-- Liste générée dynamiquement -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKQPtW0FnxaRbhPRGAJ9ZHVaKUl9_faHXxjwWZh82d3m4K6-niyPJlaVM4FC2HNJ7C/exec";
+
+        let currentEmployee = '';
+        let isAlarmEnabled = true;
+        let triggeredAlarmKeys = new Set();
+        let audioCtx = null;
+
+        const defaultCategories = [
+            { id: 'tel', name: 'Téléphone', icon: 'phone-call', color: '#3b82f6' },
+            { id: 'conv', name: 'Convention', icon: 'file-text', color: '#10b981' },
+            { id: 'inscr', name: 'Inscriptions', icon: 'user-plus', color: '#a855f7' },
+            { id: 'mail', name: 'Mails', icon: 'mail', color: '#f59e0b' },
+            { id: 'reun', name: 'Réunions', icon: 'users', color: '#f43f5e' },
+            { id: 'pause', name: 'Pause', icon: 'coffee', color: '#64748b' }
+        ];
+
+        let categories = [...defaultCategories];
+        let weeklyPlanning = [];
+        let historySessions = [];
+
+        let currentTimer = {
+            categoryId: null,
+            categoryName: null,
+            startTime: null,
+            pausedAccumulatedMs: 0,
+            lastPauseStart: null,
+            elapsedSeconds: 0,
+            intervalId: null,
+            isPaused: false
+        };
+
+        window.onload = function() {
+            detectEmbedContext();
+            updateLiveClock();
+            setInterval(updateLiveClock, 1000);
+            setInterval(checkPlanningAlarms, 1000);
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && currentTimer.categoryId !== null && !currentTimer.isPaused) {
+                    updateRealElapsedTimer();
+                }
+            });
+            window.addEventListener('focus', () => {
+                if (currentTimer.categoryId !== null && !currentTimer.isPaused) {
+                    updateRealElapsedTimer();
+                }
+            });
+            document.addEventListener('click', initAudioContext, { once: true });
+
+            renderTaskTiles();
+            renderTodayPlanning();
+            safeLucideInit();
+        };
+
+        function detectEmbedContext() {
+            try {
+                const isInIframe = window.self !== window.top;
+                if (isInIframe) {
+                    document.body.classList.add('is-embedded');
+                    const fsBtn = document.getElementById('btn-open-fullscreen');
+                    const helperBanner = document.getElementById('embed-helper-banner');
+                    if (fsBtn) {
+                        fsBtn.href = window.location.href;
+                        fsBtn.classList.remove('hidden');
+                        fsBtn.classList.add('inline-flex');
+                    }
+                    if (helperBanner) {
+                        helperBanner.classList.remove('hidden');
+                    }
+                }
+            } catch (e) {}
+        }
+
+        function safeLucideInit() {
+            try { if (window.lucide && lucide.createIcons) lucide.createIcons(); } catch(e) {}
+        }
+
+        function updateLiveClock() {
+            const now = new Date();
+            const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const dayStr = dayNames[now.getDay()];
+            const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const clockEl = document.getElementById('ipad-live-clock');
+            const dayEl = document.getElementById('today-day-label');
+            if (clockEl) clockEl.textContent = `${dayStr} ${now.toLocaleDateString('fr-FR')} • ${timeStr}`;
+            if (dayEl) dayEl.textContent = dayStr;
+        }
+
+        function initAudioContext() {
+            try {
+                if (!audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) audioCtx = new AudioContextClass();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            } catch(e) {}
+        }
+
+        function playAlarmChime() {
+            if (!isAlarmEnabled) return;
+            try {
+                initAudioContext();
+                if (!audioCtx) return;
+                const notes = [
+                    { freq: 523.25, delay: 0, duration: 0.22 },
+                    { freq: 659.25, delay: 0.22, duration: 0.22 },
+                    { freq: 783.99, delay: 0.44, duration: 0.22 },
+                    { freq: 1046.50, delay: 0.68, duration: 0.45 }
+                ];
+                const now = audioCtx.currentTime;
+                notes.forEach(note => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(note.freq, now + note.delay);
+                    gain.gain.setValueAtTime(0.001, now + note.delay);
+                    gain.gain.exponentialRampToValueAtTime(0.28, now + note.delay + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + note.delay + note.duration);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + note.delay);
+                    osc.stop(now + note.delay + note.duration + 0.02);
+                });
+            } catch(e) {}
+        }
+
+        function toggleAlarmSound() {
+            isAlarmEnabled = !isAlarmEnabled;
+            const btn = document.getElementById('btn-toggle-alarm');
+            const icon = document.getElementById('alarm-icon');
+            if (isAlarmEnabled) {
+                btn.className = "p-3 rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-600 active:scale-95 transition";
+                icon.setAttribute('data-lucide', 'bell-ring');
+                playAlarmChime();
+                showSyncStatus("Alarme sonore activée.", false);
+            } else {
+                btn.className = "p-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-400 active:scale-95 transition";
+                icon.setAttribute('data-lucide', 'bell-off');
+                showSyncStatus("Alarme sonore coupée.", false);
+            }
+            safeLucideInit();
+        }
+
+        function checkPlanningAlarms() {
+            if (!currentEmployee || !Array.isArray(weeklyPlanning) || weeklyPlanning.length === 0) return;
+            const now = new Date();
+            const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const todayName = dayNames[now.getDay()];
+            const todayStr = now.toISOString().slice(0, 10);
+            const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            weeklyPlanning.forEach(slot => {
+                if (slot.day === todayName && slot.startTime === hm) {
+                    const key = `${currentEmployee}_${todayStr}_${slot.id}_${slot.startTime}`;
+                    if (!triggeredAlarmKeys.has(key)) {
+                        triggeredAlarmKeys.add(key);
+                        triggerPlanningAlarm(slot);
+                    }
+                }
+            });
+        }
+
+        function triggerPlanningAlarm(slot) {
+            playAlarmChime();
+            const banner = document.getElementById('planning-alarm-banner');
+            const liveCat = categories.find(c => c.id === slot.categoryId) || categories.find(c => c.name === slot.categoryName);
+            const taskTitle = liveCat ? liveCat.name : slot.categoryName;
+
+            document.getElementById('planning-alarm-title').textContent = `${slot.startTime} - ${slot.endTime} : ${taskTitle}`;
+            document.getElementById('planning-alarm-subtitle').textContent = slot.note ? slot.note : "Créneau prévu dans votre planning type.";
+            document.getElementById('btn-alarm-start-task').onclick = () => {
+                if (liveCat) selectTask(liveCat.id);
+                dismissPlanningAlarm();
+            };
+            banner.classList.remove('hidden');
+            safeLucideInit();
+        }
+
+        function dismissPlanningAlarm() {
+            document.getElementById('planning-alarm-banner').classList.add('hidden');
+        }
+
+        function changeProfile(newProfile) {
+            if (currentTimer.categoryId !== null && currentEmployee && currentEmployee !== newProfile) {
+                stopCurrentTimer();
+            }
+
+            currentEmployee = newProfile;
+            resetTimerUI();
+
+            const warning = document.getElementById('profile-warning-banner');
+            const pill = document.getElementById('profile-pill');
+            const icon = document.getElementById('profile-icon');
+            const btnManual = document.getElementById('btn-manual-entry');
+            const btnHist = document.getElementById('btn-history-drawer');
+
+            if (currentEmployee) {
+                warning.classList.add('hidden');
+                pill.className = "flex items-center space-x-2 bg-blue-50 border-2 border-blue-300 px-3.5 py-2 rounded-2xl";
+                icon.className = "w-5 h-5 text-blue-600";
+                btnManual.disabled = false;
+                btnHist.disabled = false;
+                document.getElementById('current-task-sub').textContent = `Profil actif : ${currentEmployee}`;
+            } else {
+                warning.classList.remove('hidden');
+                pill.className = "flex items-center space-x-2 bg-amber-50 border-2 border-amber-300 px-3.5 py-2 rounded-2xl";
+                icon.className = "w-5 h-5 text-amber-600";
+                btnManual.disabled = true;
+                btnHist.disabled = true;
+                categories = [...defaultCategories];
+                weeklyPlanning = [];
+                historySessions = [];
+                renderTaskTiles();
+                renderTodayPlanning();
+                updateTodayBadge();
+                return;
+            }
+
+            categories = [...defaultCategories];
+            weeklyPlanning = [];
+            renderTaskTiles();
+            renderTodayPlanning();
+            fetchCloudData();
+        }
+
+        function fetchCloudData() {
+            if (!currentEmployee) return;
+            const syncIcon = document.getElementById('sync-icon');
+            if (syncIcon) syncIcon.classList.add('animate-spin');
+
+            fetch(GOOGLE_SCRIPT_URL)
+                .then(r => r.json())
+                .then(data => {
+                    if (!Array.isArray(data)) return;
+                    const empRows = data.filter(s => s.employee === currentEmployee);
+
+                    // 1. Catégories personnalisées
+                    const cfgRows = empRows.filter(s => s.categoryName === '__CONFIG_CATEGORIES__');
+                    if (cfgRows.length > 0) {
+                        cfgRows.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+                        try {
+                            const parsed = JSON.parse(cfgRows[0].endTime);
+                            if (Array.isArray(parsed) && parsed.length > 0) categories = parsed;
+                        } catch(e) {}
+                    }
+
+                    // 2. Planning hebdomadaire
+                    const planRows = empRows.filter(s => s.categoryName === '__CONFIG_PLANNING__');
+                    if (planRows.length > 0) {
+                        planRows.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+                        try {
+                            const parsedPlan = JSON.parse(planRows[0].endTime);
+                            if (Array.isArray(parsedPlan)) weeklyPlanning = parsedPlan;
+                        } catch(e) {}
+                    }
+
+                    // 3. Chrono actif en cours
+                    const actRows = empRows.filter(s => s.categoryName === '__ACTIVE_TIMER__');
+                    if (actRows.length > 0) {
+                        actRows.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+                        const raw = actRows[0].endTime;
+                        if (raw && raw !== 'NONE') {
+                            try {
+                                const state = JSON.parse(raw);
+                                if (state && state.startTimeMs) applyRestoredTimerState(state);
+                            } catch(e) {}
+                        }
+                    }
+
+                    // 4. Historique des sessions (en tenant compte des plages écrasées)
+                    const overriddenIds = new Set();
+                    empRows.forEach(s => {
+                        if (s.categoryName === '__OVERRIDDEN_SESSIONS__' && s.endTime) {
+                            try {
+                                const ids = JSON.parse(s.endTime);
+                                if (Array.isArray(ids)) ids.forEach(id => overriddenIds.add(id));
+                            } catch(e) {}
+                        }
+                    });
+
+                    historySessions = empRows.filter(s =>
+                        s.categoryName !== '__CONFIG_CATEGORIES__' &&
+                        s.categoryName !== '__CONFIG_PLANNING__' &&
+                        s.categoryName !== '__ACTIVE_TIMER__' &&
+                        s.categoryName !== '__OVERRIDDEN_SESSIONS__' &&
+                        !overriddenIds.has(s.id)
+                    );
+                    historySessions.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+
+                    renderTaskTiles();
+                    renderTodayPlanning();
+                    updateTodayBadge();
+                })
+                .catch(() => showSyncStatus("Erreur de synchronisation Google Sheets.", true))
+                .finally(() => { if (syncIcon) syncIcon.classList.remove('animate-spin'); });
+        }
+
+        function applyRestoredTimerState(state) {
+            if (!state || state.employee !== currentEmployee) return;
+            let cat = categories.find(c => c.id === state.categoryId) || categories.find(c => c.name === state.categoryName);
+            if (!cat) cat = { id: state.categoryId || 'restored', name: state.categoryName || 'Tâche', color: '#3b82f6' };
+
+            if (currentTimer.intervalId) clearInterval(currentTimer.intervalId);
+            currentTimer.categoryId = cat.id;
+            currentTimer.categoryName = cat.name;
+            currentTimer.startTime = new Date(state.startTimeMs);
+            currentTimer.pausedAccumulatedMs = state.pausedAccumulatedMs || 0;
+            currentTimer.lastPauseStart = state.lastPauseStartMs ? new Date(state.lastPauseStartMs) : null;
+            currentTimer.isPaused = !!state.isPaused;
+
+            updateActiveCardVisuals(cat);
+            updateRealElapsedTimer();
+            currentTimer.intervalId = setInterval(() => {
+                if (!currentTimer.isPaused) updateRealElapsedTimer();
+            }, 500);
+            renderTaskTiles();
+        }
+
+        function updateActiveCardVisuals(cat) {
+            const card = document.getElementById('active-timer-card');
+            card.style.backgroundColor = cat.color;
+            document.getElementById('current-task-name').textContent = cat.name;
+            document.getElementById('current-task-sub').textContent = `Profil : ${currentEmployee}`;
+            document.getElementById('status-dot').className = currentTimer.isPaused
+                ? "w-2.5 h-2.5 rounded-full bg-amber-300 mr-2"
+                : "w-2.5 h-2.5 rounded-full bg-white animate-ping mr-2";
+            document.getElementById('status-label').textContent = currentTimer.isPaused ? "En pause" : "Chronomètre actif";
+
+            document.getElementById('btn-toggle-pause').disabled = false;
+            document.getElementById('pause-label').textContent = currentTimer.isPaused ? "Reprendre" : "Pause";
+            document.getElementById('pause-icon').setAttribute('data-lucide', currentTimer.isPaused ? 'play' : 'pause');
+            document.getElementById('btn-stop').disabled = false;
+            document.getElementById('btn-cancel').disabled = false;
+            safeLucideInit();
+        }
+
+        function resetTimerUI() {
+            if (currentTimer.intervalId) clearInterval(currentTimer.intervalId);
+            currentTimer = {
+                categoryId: null,
+                categoryName: null,
+                startTime: null,
+                pausedAccumulatedMs: 0,
+                lastPauseStart: null,
+                elapsedSeconds: 0,
+                intervalId: null,
+                isPaused: false
+            };
+
+            const card = document.getElementById('active-timer-card');
+            card.style.backgroundColor = '';
+            document.getElementById('current-task-name').textContent = "Aucune tâche active";
+            document.getElementById('current-task-sub').textContent = currentEmployee ? `Profil actif : ${currentEmployee}` : "Sélectionnez votre profil";
+            document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-slate-400 mr-2";
+            document.getElementById('status-label').textContent = "En attente";
+            document.getElementById('timer-display').textContent = "00:00:00";
+
+            document.getElementById('btn-toggle-pause').disabled = true;
+            document.getElementById('pause-label').textContent = "Pause";
+            document.getElementById('pause-icon').setAttribute('data-lucide', 'pause');
+            document.getElementById('btn-stop').disabled = true;
+            document.getElementById('btn-cancel').disabled = true;
+            safeLucideInit();
+        }
+
+        function getExactElapsedSeconds() {
+            if (currentTimer.categoryId === null || !currentTimer.startTime) return 0;
+            const nowMs = currentTimer.isPaused && currentTimer.lastPauseStart
+                ? currentTimer.lastPauseStart.getTime()
+                : Date.now();
+            return Math.floor(Math.max(0, nowMs - currentTimer.startTime.getTime() - currentTimer.pausedAccumulatedMs) / 1000);
+        }
+
+        function updateRealElapsedTimer() {
+            if (currentTimer.categoryId === null || !currentTimer.startTime) return;
+            currentTimer.elapsedSeconds = getExactElapsedSeconds();
+            document.getElementById('timer-display').textContent = formatHms(currentTimer.elapsedSeconds);
+        }
+
+        function pushActiveTimerToCloud(isNull = false) {
+            if (!currentEmployee) return;
+            const stateObj = isNull || currentTimer.categoryId === null ? null : {
+                employee: currentEmployee,
+                categoryId: currentTimer.categoryId,
+                categoryName: currentTimer.categoryName,
+                startTimeMs: currentTimer.startTime.getTime(),
+                pausedAccumulatedMs: currentTimer.pausedAccumulatedMs,
+                lastPauseStartMs: currentTimer.lastPauseStart ? currentTimer.lastPauseStart.getTime() : null,
+                isPaused: currentTimer.isPaused,
+                updatedAtMs: Date.now()
+            };
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: 'act_' + Date.now(),
+                    employee: currentEmployee,
+                    date: new Date().toISOString().slice(0, 10),
+                    categoryName: '__ACTIVE_TIMER__',
+                    startTime: new Date().toISOString(),
+                    endTime: stateObj ? JSON.stringify(stateObj) : 'NONE',
+                    durationSeconds: 0
+                })
+            }).catch(() => {});
+        }
+
+        function selectTask(catId) {
+            if (!currentEmployee) {
+                showSyncStatus("Choisissez d'abord votre profil en haut à droite.", true);
+                return;
+            }
+            const cat = categories.find(c => c.id === catId);
+            if (!cat || currentTimer.categoryId === catId) return;
+
+            if (currentTimer.categoryId !== null) stopCurrentTimer();
+
+            currentTimer.categoryId = cat.id;
+            currentTimer.categoryName = cat.name;
+            currentTimer.startTime = new Date();
+            currentTimer.pausedAccumulatedMs = 0;
+            currentTimer.lastPauseStart = null;
+            currentTimer.elapsedSeconds = 0;
+            currentTimer.isPaused = false;
+
+            updateActiveCardVisuals(cat);
+            pushActiveTimerToCloud(false);
+
+            currentTimer.intervalId = setInterval(() => {
+                if (!currentTimer.isPaused) updateRealElapsedTimer();
+            }, 500);
+
+            renderTaskTiles();
+        }
+
+        function togglePause() {
+            if (currentTimer.categoryId === null) return;
+            const cat = categories.find(c => c.id === currentTimer.categoryId) || { name: currentTimer.categoryName, color: '#3b82f6' };
+
+            if (!currentTimer.isPaused) {
+                currentTimer.isPaused = true;
+                currentTimer.lastPauseStart = new Date();
+            } else {
+                if (currentTimer.lastPauseStart) {
+                    currentTimer.pausedAccumulatedMs += (Date.now() - currentTimer.lastPauseStart.getTime());
+                }
+                currentTimer.lastPauseStart = null;
+                currentTimer.isPaused = false;
+                updateRealElapsedTimer();
+            }
+            updateActiveCardVisuals(cat);
+            pushActiveTimerToCloud(false);
+        }
+
+        function stopCurrentTimer() {
+            if (currentTimer.categoryId === null) return;
+            clearInterval(currentTimer.intervalId);
+            const finalSec = getExactElapsedSeconds();
+
+            if (finalSec > 0) {
+                const session = {
+                    id: 'sess_' + Date.now(),
+                    employee: currentEmployee,
+                    date: currentTimer.startTime.toISOString().slice(0, 10),
+                    categoryName: currentTimer.categoryName,
+                    startTime: currentTimer.startTime.toISOString(),
+                    endTime: new Date().toISOString(),
+                    durationSeconds: finalSec
+                };
+                historySessions.unshift(session);
+                updateTodayBadge();
+
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(session)
+                }).then(() => {
+                    showSyncStatus(`Session "${session.categoryName}" (${formatHm(finalSec)}) enregistrée !`, false);
+                }).catch(() => {
+                    showSyncStatus("Erreur réseau lors de l'envoi.", true);
+                });
+            }
+
+            resetTimerUI();
+            pushActiveTimerToCloud(true);
+            renderTaskTiles();
+        }
+
+        function cancelCurrentTimer() {
+            if (currentTimer.categoryId === null) return;
+            const name = currentTimer.categoryName;
+            resetTimerUI();
+            pushActiveTimerToCloud(true);
+            renderTaskTiles();
+            showSyncStatus(`Chrono "${name}" annulé (non sauvegardé).`, false);
+        }
+
+        function renderTaskTiles() {
+            const grid = document.getElementById('ipad-task-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            categories.forEach(cat => {
+                const isRunning = currentTimer.categoryId === cat.id;
+                const isDisabled = !currentEmployee;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.disabled = isDisabled;
+                btn.onclick = () => selectTask(cat.id);
+
+                let cls = "touch-tile relative min-h-[125px] sm:min-h-[140px] p-5 rounded-3xl border-2 flex flex-col items-center justify-center text-center ";
+                if (isDisabled) {
+                    cls += "bg-slate-200/60 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed";
+                } else if (isRunning) {
+                    cls += "text-white shadow-xl ring-4 ring-offset-2";
+                    btn.style.backgroundColor = cat.color;
+                    btn.style.borderColor = cat.color;
+                } else {
+                    cls += "bg-white hover:bg-slate-50 border-slate-200/90 text-slate-800 shadow-sm";
+                }
+                btn.className = cls;
+
+                const iconWrapStyle = (!isRunning && !isDisabled) ? `style="background-color: ${cat.color}18; color: ${cat.color};"` : `style="background-color: rgba(255,255,255,0.2); color: #ffffff;"`;
+
+                btn.innerHTML = `
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" ${iconWrapStyle}>
+                        <i data-lucide="${cat.icon || 'tag'}" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-base sm:text-lg font-extrabold tracking-tight leading-tight">${cat.name}</span>
+                    ${isRunning ? '<span class="mt-1.5 text-[11px] font-extrabold uppercase tracking-wider bg-black/20 px-2.5 py-0.5 rounded-full animate-pulse">Actif</span>' : ''}
+                `;
+                grid.appendChild(btn);
+            });
+
+            safeLucideInit();
+        }
+
+        function renderTodayPlanning() {
+            const container = document.getElementById('ipad-today-planning');
+            const badge = document.getElementById('today-slots-count');
+            if (!container) return;
+
+            const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            const todayName = dayNames[new Date().getDay()];
+
+            const todaySlots = weeklyPlanning
+                .filter(s => s.day === todayName)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            badge.textContent = `${todaySlots.length} créneau${todaySlots.length > 1 ? 'x' : ''}`;
+            container.innerHTML = '';
+
+            if (todaySlots.length === 0) {
+                container.innerHTML = `<div class="w-full py-5 text-center text-xs sm:text-sm text-slate-400 font-medium bg-slate-50 rounded-2xl border border-dashed border-slate-200">Aucun créneau type configuré pour ${todayName}.</div>`;
+                return;
+            }
+
+            todaySlots.forEach(slot => {
+                const liveCat = categories.find(c => c.id === slot.categoryId) || categories.find(c => c.name === slot.categoryName);
+                const color = liveCat ? liveCat.color : (slot.color || '#6366f1');
+                const title = liveCat ? liveCat.name : slot.categoryName;
+
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.onclick = () => { if (liveCat) selectTask(liveCat.id); };
+                card.className = "touch-tile shrink-0 min-w-[210px] text-left bg-slate-50 hover:bg-indigo-50/50 border border-slate-200 rounded-2xl p-3.5 flex flex-col justify-between gap-2";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between w-full">
+                        <span class="text-xs font-mono font-extrabold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-lg">${slot.startTime} - ${slot.endTime}</span>
+                        <i data-lucide="play" class="w-4 h-4 text-slate-400"></i>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${color};"></span>
+                        <span class="text-sm font-extrabold text-slate-800 truncate">${title}</span>
+                    </div>
+                    ${slot.note ? `<p class="text-[11px] text-slate-500 truncate w-full">${slot.note}</p>` : ''}
+                `;
+                container.appendChild(card);
+            });
+
+            safeLucideInit();
+        }
+
+        function updateTodayBadge() {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const totalSec = historySessions
+                .filter(s => s.startTime && s.startTime.startsWith(todayStr))
+                .reduce((acc, s) => acc + (parseInt(s.durationSeconds, 10) || 0), 0);
+            const badge = document.getElementById('today-total-badge');
+            if (badge) badge.textContent = formatHm(totalSec);
+        }
+
+        // ================= SAISIE MANUELLE AVEC ÉCRASEMENT =================
+        function openManualEntryModal() {
+            if (!currentEmployee) return;
+            const select = document.getElementById('manual-task-select');
+            select.innerHTML = '';
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.name;
+                select.appendChild(opt);
+            });
+            document.getElementById('manual-date-input').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('manual-start-input').value = '09:00';
+            document.getElementById('manual-end-input').value = '10:00';
+            updateManualDurationPreview();
+            document.getElementById('modal-manual-entry').classList.remove('hidden');
+            safeLucideInit();
+        }
+
+        function closeManualEntryModal() {
+            document.getElementById('modal-manual-entry').classList.add('hidden');
+        }
+
+        function updateManualDurationPreview() {
+            const d = document.getElementById('manual-date-input').value;
+            const s = document.getElementById('manual-start-input').value;
+            const e = document.getElementById('manual-end-input').value;
+            const prev = document.getElementById('manual-duration-preview');
+            if (!d || !s || !e) { prev.textContent = '--'; return; }
+
+            const diffSec = Math.floor((new Date(`${d}T${e}:00`) - new Date(`${d}T${s}:00`)) / 1000);
+            if (isNaN(diffSec) || diffSec <= 0) {
+                prev.textContent = 'Horaire invalide';
+                prev.className = 'font-mono text-sm font-extrabold text-red-600';
+            } else {
+                prev.textContent = `${formatHm(diffSec)} (${formatHms(diffSec)})`;
+                prev.className = 'font-mono text-base font-extrabold text-emerald-700';
+            }
+        }
+
+        function saveManualEntry() {
+            if (!currentEmployee) return;
+            const catId = document.getElementById('manual-task-select').value;
+            const dateVal = document.getElementById('manual-date-input').value;
+            const startVal = document.getElementById('manual-start-input').value;
+            const endVal = document.getElementById('manual-end-input').value;
+            const cat = categories.find(c => c.id === catId);
+            if (!cat || !dateVal || !startVal || !endVal) return;
+
+            const startObj = new Date(`${dateVal}T${startVal}:00`);
+            const endObj = new Date(`${dateVal}T${endVal}:00`);
+            const durationSec = Math.floor((endObj - startObj) / 1000);
+            if (isNaN(durationSec) || durationSec <= 0) {
+                showSyncStatus("L'heure de fin doit être après le début.", true);
+                return;
+            }
+
+            const newStartMs = startObj.getTime();
+            const newEndMs = endObj.getTime();
+            const overriddenIds = [];
+            const replacementSegments = [];
+            const keptSessions = [];
+
+            historySessions.forEach(s => {
+                const sStartMs = s.startTime ? new Date(s.startTime).getTime() : NaN;
+                const sDur = parseInt(s.durationSeconds, 10) || 0;
+                const sEndMs = (s.endTime && !isNaN(new Date(s.endTime).getTime())) ? new Date(s.endTime).getTime() : (sStartMs + sDur * 1000);
+
+                if (!isNaN(sStartMs) && !isNaN(sEndMs) && sStartMs < newEndMs && sEndMs > newStartMs) {
+                    if (s.id) overriddenIds.push(s.id);
+                    if (sStartMs < newStartMs) {
+                        const beforeDur = Math.floor((newStartMs - sStartMs) / 1000);
+                        if (beforeDur > 0) {
+                            replacementSegments.push({
+                                id: 'seg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                                employee: currentEmployee,
+                                date: new Date(sStartMs).toISOString().slice(0, 10),
+                                categoryName: s.categoryName,
+                                startTime: new Date(sStartMs).toISOString(),
+                                endTime: new Date(newStartMs).toISOString(),
+                                durationSeconds: beforeDur
+                            });
+                        }
+                    }
+                    if (sEndMs > newEndMs) {
+                        const afterDur = Math.floor((sEndMs - newEndMs) / 1000);
+                        if (afterDur > 0) {
+                            replacementSegments.push({
+                                id: 'seg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                                employee: currentEmployee,
+                                date: new Date(newEndMs).toISOString().slice(0, 10),
+                                categoryName: s.categoryName,
+                                startTime: new Date(newEndMs).toISOString(),
+                                endTime: new Date(sEndMs).toISOString(),
+                                durationSeconds: afterDur
+                            });
+                        }
+                    }
+                } else {
+                    keptSessions.push(s);
+                }
+            });
+
+            const session = {
+                id: 'man_' + Date.now(),
+                employee: currentEmployee,
+                date: dateVal,
+                categoryName: cat.name,
+                startTime: startObj.toISOString(),
+                endTime: endObj.toISOString(),
+                durationSeconds: durationSec
+            };
+
+            historySessions = [session, ...replacementSegments, ...keptSessions];
+            historySessions.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+            updateTodayBadge();
+            closeManualEntryModal();
+
+            const payloads = [];
+            if (overriddenIds.length > 0) {
+                payloads.push({
+                    id: 'ovr_' + Date.now(),
+                    employee: currentEmployee,
+                    date: dateVal,
+                    categoryName: '__OVERRIDDEN_SESSIONS__',
+                    startTime: new Date().toISOString(),
+                    endTime: JSON.stringify(overriddenIds),
+                    durationSeconds: 0
+                });
+            }
+            replacementSegments.forEach(seg => payloads.push(seg));
+            payloads.push(session);
+
+            Promise.all(payloads.map(p =>
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(p)
+                })
+            )).then(() => {
+                showSyncStatus(`Entrée "${cat.name}" (${formatHm(durationSec)}) enregistrée !`, false);
+            }).catch(() => {
+                showSyncStatus("Erreur réseau lors de l'envoi.", true);
+            });
+        }
+
+        // ================= JOURNAL DU JOUR MODAL =================
+        function openHistoryModal() {
+            if (!currentEmployee) return;
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayList = historySessions.filter(s => s.startTime && s.startTime.startsWith(todayStr));
+            const totalSec = todayList.reduce((acc, s) => acc + (parseInt(s.durationSeconds, 10) || 0), 0);
+
+            document.getElementById('history-modal-subtitle').textContent = `${todayList.length} session(s) • Total : ${formatHm(totalSec)}`;
+            const container = document.getElementById('today-sessions-list');
+            container.innerHTML = '';
+
+            if (todayList.length === 0) {
+                container.innerHTML = `<div class="py-10 text-center text-slate-400 text-sm">Aucune activité enregistrée aujourd'hui.</div>`;
+            } else {
+                todayList.forEach(s => {
+                    const cat = categories.find(c => c.name === s.categoryName);
+                    const color = cat ? cat.color : '#3b82f6';
+                    const start = new Date(s.startTime);
+                    const end = new Date(s.endTime);
+
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80";
+                    row.innerHTML = `
+                        <div class="flex items-center space-x-3">
+                            <span class="w-3.5 h-3.5 rounded-full shrink-0" style="background-color: ${color};"></span>
+                            <div>
+                                <div class="text-sm font-extrabold text-slate-900">${s.categoryName}</div>
+                                <div class="text-xs font-mono text-slate-500">${formatTimeShort(start)} → ${formatTimeShort(end)}</div>
+                            </div>
+                        </div>
+                        <div class="font-mono text-sm font-extrabold text-slate-800 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                            ${formatHms(parseInt(s.durationSeconds, 10) || 0)}
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            }
+
+            document.getElementById('modal-today-history').classList.remove('hidden');
+            safeLucideInit();
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('modal-today-history').classList.add('hidden');
+        }
+
+        function showSyncStatus(msg, isErr) {
+            const el = document.getElementById('sync-status');
+            if (!el) return;
+            el.className = `p-3.5 rounded-2xl text-xs sm:text-sm font-bold text-center shadow-xs ${isErr ? 'bg-red-100 text-red-900' : 'bg-emerald-100 text-emerald-900'}`;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3500);
+        }
+
+        function formatHm(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+        }
+
+        function formatHms(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function formatTimeShort(dateObj) {
+            if (!dateObj || isNaN(dateObj.getTime())) return '-';
+            return dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        }
+    </script>
+</body>
+</html>
